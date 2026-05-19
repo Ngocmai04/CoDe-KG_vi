@@ -1,15 +1,15 @@
 # prompts_vi.py
-# Vietnamese LLM prompts for financial news KG extraction (CafeF, Vietstock, etc.)
-# JSON keys stay in English for downstream parsers; content may be Vietnamese.
+# Vietnamese LLM prompts for domain-agnostic KG extraction.
+# JSON keys stay in English for downstream parsers; entity/relation text may be Vietnamese.
 
-COREf_FICL_SYSTEM = r"""Bạn là hệ thống phân giải đồng tham chiếu (coreference) cho văn bản tin tài chính tiếng Việt.
-Dưới đây là một đoạn tin được biểu diễn dưới dạng chuỗi token kèm chỉ số (token, index).
-Nhiệm vụ: tìm các biểu thức đồng tham chiếu (đại từ, tên viết tắt, cụm danh từ lặp lại) và ánh xạ về thực thể gốc.
+COREf_FICL_SYSTEM = r"""Bạn là hệ thống phân giải đồng tham chiếu (coreference) cho văn bản tiếng Việt thuộc bất kỳ lĩnh vực nào.
+Dưới đây là một đoạn văn được biểu diễn dưới dạng chuỗi token kèm chỉ số (token, index).
+Nhiệm vụ: tìm các biểu thức đồng tham chiếu (đại từ, tên viết tắt, cụm danh từ lặp lại) và ánh xạ về thực thể hoặc khái niệm gốc.
 
 Quy tắc:
-- Chỉ ghi các biểu thức tham chiếu ngược về một thực thể hoặc khái niệm đã xuất hiện trước đó (công ty, cổ phiếu, người, chỉ số, sự kiện M&A, v.v.).
+- Chỉ ghi các biểu thức tham chiếu ngược về một thực thể, khái niệm hoặc sự kiện đã xuất hiện trước đó trong đoạn.
 - "StartToken" và "EndToken" lấy đúng chỉ số token trong đoạn đã cho.
-- "RefersTo" là cụm danh từ đầy đủ hoặc tên riêng tiếng Việt/Anh của thực thể gốc (ví dụ: "Tập đoàn Vingroup", "mã HPG", "UBCKNN").
+- "RefersTo" là cụm danh từ đầy đủ hoặc tên riêng của thực thể gốc (tiếng Việt hoặc ngoại ngữ giữ nguyên trong văn bản).
 - Không tạo tham chiếu cho thông tin mới chưa xuất hiện.
 
 Định dạng mỗi mục (một JSON object trên một dòng hoặc trong mảng):
@@ -23,30 +23,29 @@ Quy tắc:
 Chỉ trả về các object JSON hợp lệ, không giải thích thêm.
 """
 
-COREf_FICL_USER = r"""Xử lý đoạn tin đã token hóa sau:
+COREf_FICL_USER = r"""Xử lý đoạn văn đã token hóa sau:
 
 {tokenized_text}
 """
 
 
-SIMPLIFY_COMPLEX_SYSTEM = r"""Bạn tách câu phức (câu chứa mệnh đề phụ, quan hệ từ/đại từ quan hệ) trong tin tài chính thành các câu đơn, mỗi câu một sự kiện hoặc quan hệ rõ ràng.
+SIMPLIFY_COMPLEX_SYSTEM = r"""Bạn tách câu phức (câu chứa mệnh đề phụ, quan hệ từ hoặc đại từ quan hệ) thành các câu đơn, mỗi câu một ý hoặc quan hệ rõ ràng.
 
 Ví dụ 1:
 Input:
-"Theo báo cáo quý III mà Vingroup công bố hôm qua, doanh thu hợp nhất tăng 15% so với cùng kỳ."
+"Harald Kaas, người học tại Học viện Bách khoa Munich, là kiến trúc sư người Na Uy."
 Output:
-S1 -> Vingroup công bố báo cáo quý III hôm qua.
-S2 -> Doanh thu hợp nhất của Vingroup tăng 15% so với cùng kỳ.
+S1 -> Harald Kaas học tại Học viện Bách khoa Munich.
+S2 -> Harald Kaas là kiến trúc sư người Na Uy.
 
 Ví dụ 2:
 Input:
-"Cổ phiếu HPG, vốn niêm yết trên HOSE, đã tăng trần sau khi công ty công bố kế hoạch mở rộng nhà máy."
+"Đỉnh Coburg, vốn nằm trong dãy Erul Heights, cao 783 m trên bán đảo Trinity."
 Output:
-S1 -> Cổ phiếu HPG niêm yết trên HOSE.
-S2 -> Cổ phiếu HPG tăng trần.
-S3 -> Công ty công bố kế hoạch mở rộng nhà máy.
+S1 -> Đỉnh Coburg nằm trong dãy Erul Heights.
+S2 -> Đỉnh Coburg cao 783 m trên bán đảo Trinity.
 
-Áp dụng cùng quy tắc cho câu mới. Giữ tên riêng, mã CK, số liệu.
+Áp dụng cùng quy tắc cho câu mới. Giữ nguyên tên riêng, số liệu và thuật ngữ chuyên ngành.
 ***CHỈ in các dòng dạng S1 -> ..., S2 -> ..., không thêm lời dẫn.***
 """
 
@@ -54,47 +53,46 @@ SIMPLIFY_COMPLEX_USER = r"""Input: "{sentence}"
 """
 
 
-SIMPLIFY_COMPOUND_SYSTEM = r"""Bạn tách câu ghép (nhiều mệnh đề độc lập nối bằng và/hoặc/nhưng) trong tin tài chính thành câu đơn.
+SIMPLIFY_COMPOUND_SYSTEM = r"""Bạn tách câu ghép (nhiều mệnh đề độc lập nối bằng và, hoặc, nhưng,…) thành câu đơn.
 
 Ví dụ 1:
 Input:
-"FPT báo lãi ròng quý II tăng 20% và cổ tức tiền mặt dự kiến 15%."
+"Lung cancer là nguyên nhân tử vong hàng đầu do ung thư ở Mỹ, và tỷ lệ mắc bệnh vẫn cao ở nhiều quốc gia."
 Output:
-S1 -> FPT báo lãi ròng quý II tăng 20%.
-S2 -> FPT dự kiến cổ tức tiền mặt 15%.
+S1 -> Lung cancer là nguyên nhân tử vong hàng đầu do ung thư ở Mỹ.
+S2 -> Tỷ lệ mắc lung cancer vẫn cao ở nhiều quốc gia.
 
 Ví dụ 2:
 Input:
-"VNM là thương hiệu sữa hàng đầu Việt Nam, còn MSN đa dạng hóa sang bán lẻ."
+"Khí hậu thay đổi làm tan băng cực nhanh hơn, và mực nước biển dâng đe dọa các cộng đồng ven biển."
 Output:
-S1 -> VNM là thương hiệu sữa hàng đầu Việt Nam.
-S2 -> MSN đa dạng hóa sang bán lẻ.
+S1 -> Khí hậu thay đổi làm tan băng cực nhanh hơn.
+S2 -> Mực nước biển dâng đe dọa các cộng đồng ven biển.
 
 CHỈ in các dòng S1 -> ..., S2 -> ..., không giải thích.
 """
 
-SIMPLIFY_COMPOUND_USER = r"""Input: "{sentence}"
+SIMPLIFY_COMPOUND_USER = r"""Input: "{sentence}"
 """
 
 
-SIMPLIFY_COMPOUND_COMPLEX_SYSTEM = r"""Bạn tách câu ghép-phức (vừa có mệnh đề phụ vừa nhiều mệnh đề chính) trong tin tài chính thành câu đơn.
+SIMPLIFY_COMPOUND_COMPLEX_SYSTEM = r"""Bạn tách câu ghép-phức (vừa có mệnh đề phụ vừa nhiều mệnh đề chính) thành câu đơn.
 
 Ví dụ 1:
 Input:
-"Mặc dù thị trường chứng khoán biến động mạnh, Vietcombank vẫn báo lợi nhuận trước thuế tăng và tăng room ngoại."
+"Mặc dù nhiệt độ tăng, các cánh đồng vẫn khô hạn, và nông dân lo ngại về hạn hán."
 Output:
-S1 -> Thị trường chứng khoán biến động mạnh.
-S2 -> Vietcombank vẫn báo lợi nhuận trước thuế tăng.
-S3 -> Vietcombank tăng room ngoại.
+S1 -> Nhiệt độ tăng.
+S2 -> Các cánh đồng vẫn khô hạn.
+S3 -> Nông dân lo ngại về hạn hán.
 
 Ví dụ 2:
 Input:
-"Khi giá dầu thế giới giảm, PVS ghi nhận doanh thu sụt, song lợi nhuận ròng vẫn dương nhờ cắt giảm chi phí."
+"Khi bệnh nhân được điều trị bằng thuốc đã được tổng hợp trong phòng thí nghiệm, chúng tôi đo sự thay đổi huỳnh quang bằng máy quang phổ."
 Output:
-S1 -> Giá dầu thế giới giảm.
-S2 -> PVS ghi nhận doanh thu sụt.
-S3 -> Lợi nhuận ròng của PVS vẫn dương.
-S4 -> PVS cắt giảm chi phí.
+S1 -> Bệnh nhân được điều trị bằng thuốc.
+S2 -> Thuốc đã được tổng hợp trong phòng thí nghiệm.
+S3 -> Chúng tôi đo sự thay đổi huỳnh quang bằng máy quang phổ.
 
 CHỈ in các dòng S1 -> ..., S2 -> ..., không giải thích.
 """
@@ -103,48 +101,58 @@ SIMPLIFY_COMPOUND_COMPLEX_USER = r"""Input: "{sentence}"
 """
 
 
-REL_EXTRACT_SYSTEM = r"""Bạn là agent trích xuất quan hệ cho đồ thị tri thức (KG) từ câu đơn tiếng Việt trong lĩnh vực tài chính—chứng khoán, doanh nghiệp, ngân hàng, M&A, niêm yết, kết quả kinh doanh (CafeF, Vietstock, v.v.).
+REL_EXTRACT_SYSTEM = r"""Bạn là agent trích xuất quan hệ cho đồ thị tri thức (KG) từ câu đơn tiếng Việt, áp dụng được cho mọi lĩnh vực (khoa học, địa lý, lịch sử, y học, kinh doanh, v.v.).
 
 Nhiệm vụ:
-- Nhận diện thực thể: công ty, mã CK, người (CEO/CFO), sàn (HOSE/HNX/UPCOM), chỉ số, sản phẩm/dịch vụ, số liệu tài chính, quốc gia/vùng.
-- Xác định quan hệ từ động từ, giới từ, cụm nghĩa (ví dụ: sở hữu, mua lại, niêm yết tại, báo cáo, tăng/giảm, đầu tư vào, là đối tác của).
+- Nhận diện thực thể: danh từ, cụm danh từ, tên riêng, khái niệm, sự kiện, địa điểm, tổ chức, người, hiện tượng, đại lượng hoặc thuộc tính.
+- Xác định quan hệ từ động từ, giới từ và nghĩa câu (ví dụ: là, nằm tại, thuộc, gây ra, có, tham gia, đạt được).
 - Xuất bộ ba JSON với khóa tiếng Anh: "Entity 1", "Relationship", "Entity 2".
-- Giá trị có thể bằng tiếng Việt; giữ nguyên tên riêng và mã CK.
+- Giá trị có thể bằng tiếng Việt; giữ nguyên tên riêng và thuật ngữ như trong câu gốc.
 - Một câu có thể có nhiều triple trong mảng JSON.
 - Bỏ qua triple không có ý nghĩa ngữ nghĩa.
 
 Ví dụ:
 
 Input:
-"Everest là thương hiệu gia vị lớn nhất Ấn Độ có trụ sở tại Mumbai."
+"Đỉnh Coburg là đỉnh núi đá cao 783 m nằm trong dãy Erul Heights trên bán đảo Trinity."
 Output:
 [{
-"Entity 1": "Everest",
-"Entity 2": "thương hiệu gia vị lớn nhất Ấn Độ",
+"Entity 1": "Đỉnh Coburg",
+"Entity 2": "đỉnh núi đá cao 783 m",
 "Relationship": "là"
 },
 {
-"Entity 1": "Everest",
-"Entity 2": "Mumbai",
-"Relationship": "có trụ sở tại"
+"Entity 1": "Đỉnh Coburg",
+"Entity 2": "dãy Erul Heights",
+"Relationship": "nằm trong"
+},
+{
+"Entity 1": "Đỉnh Coburg",
+"Entity 2": "bán đảo Trinity",
+"Relationship": "nằm trên"
 }]
 
 Input:
-"Paul L. Foster là chủ tịch hội đồng quản trị của Western Refining."
+"Harald Kaas là kiến trúc sư người Na Uy."
 Output:
 [{
-"Entity 1": "Paul L. Foster",
-"Entity 2": "Western Refining",
-"Relationship": "là chủ tịch hội đồng quản trị của"
+"Entity 1": "Harald Kaas",
+"Entity 2": "kiến trúc sư người Na Uy",
+"Relationship": "là"
 }]
 
 Input:
-"Theo nghiên cứu năm 2007, doanh thu hợp nhất của FPT tăng 18%."
+"Với lựa chọn đặc trưng có ý nghĩa lâm sàng, phương pháp over-sampling đạt kết quả AUC cao nhất."
 Output:
 [{
-"Entity 1": "FPT",
-"Entity 2": "doanh thu hợp nhất tăng 18%",
-"Relationship": "báo cáo theo nghiên cứu năm 2007"
+"Entity 1": "lựa chọn đặc trưng có ý nghĩa lâm sàng",
+"Entity 2": "phương pháp over-sampling",
+"Relationship": "Với"
+},
+{
+"Entity 1": "phương pháp over-sampling",
+"Entity 2": "kết quả AUC cao nhất",
+"Relationship": "đạt"
 }]
 
 Chỉ trả về mảng JSON hợp lệ, không markdown, không giải thích.

@@ -1,6 +1,7 @@
 # prompts.py
+# English LLM prompts for domain-agnostic KG extraction.
 
-COREf_FICL_SYSTEM = r"""You are a coreference resolution agent. Below is a biomedical abstract presented as tokenized text with indices. Your task is to identify and annotate coreference expressions within the text. For each co-referent expression:
+COREf_FICL_SYSTEM = r"""You are a coreference resolution agent. Below is a text passage (any domain) presented as tokenized text with indices. Your task is to identify and annotate coreference expressions within the text. For each co-referent expression:
 
 - Record the surface form under "Expression".
 - Use the provided token indices as "StartToken" and "EndToken" (they are the same for single-token expressions).
@@ -16,7 +17,7 @@ Use this format:
 }
 """
 
-COREf_FICL_USER = r"""Now process this tokenized abstract:
+COREf_FICL_USER = r"""Now process this tokenized passage:
 
 {tokenized_text}
 """
@@ -114,10 +115,10 @@ SIMPLIFY_COMPOUND_COMPLEX_USER = r"""Input: "{sentence}"
 """
 
 
-REL_EXTRACT_SYSTEM = r"""You are a knowledge graph relationship extraction agent. Your task is to extract structured relationships from simple sentences to create knowledge graph triples. Each triple should contain two entities and the relationship between them.
+REL_EXTRACT_SYSTEM = r"""You are a knowledge graph relationship extraction agent for text in any domain (science, geography, history, medicine, business, etc.). Your task is to extract structured relationships from simple sentences to create knowledge graph triples. Each triple should contain two entities and the relationship between them.
 
 - Analyze the sentence structure and identify key components.
-- Extract all meaningful entities (nouns, noun phrases, proper nouns, concepts).
+- Extract all meaningful entities (nouns, noun phrases, proper nouns, concepts, events, places).
 - Identify relationships between entities based on verbs, prepositions, and semantic meaning.
 - Form triples (Entity 1 -> Relationship -> Entity 2) as structured relationships.
 - Validate that each triple captures meaningful semantic information.
