@@ -1,9 +1,13 @@
 # bert_sentence_classifier.py
+import inspect
 import os
+import shutil
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
+
+from paths import resolve_existing_path
 import torch
 from transformers import (
     AutoTokenizer,
@@ -12,6 +16,18 @@ from transformers import (
     Trainer,
     DataCollatorWithPadding,
 )
+
+
+def _filter_init_kwargs(cls: Type, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop kwargs unsupported by the installed transformers version (e.g. v5 removes overwrite_output_dir)."""
+    params = set(inspect.signature(cls.__init__).parameters.keys()) - {"self"}
+    return {k: v for k, v in kwargs.items() if k in params}
+
+
+def _prepare_fresh_output_dir(path: str) -> None:
+    if os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path, exist_ok=True)
 
 @dataclass
 class BertClassifierConfig:
@@ -84,6 +100,13 @@ class BertSentenceClassifier:
         if train_csv is None:
             raise ValueError("No finetuned BERT found and --bert_train_csv was not provided.")
 
+        train_csv = resolve_existing_path(
+            train_csv,
+            fallbacks=("train.csv",),
+            description="BERT training CSV",
+        )
+        print(f"[bert] training from {train_csv}")
+
         try:
             df = pd.read_csv(train_csv, encoding="utf-8")
         except UnicodeDecodeError:
@@ -101,25 +124,36 @@ class BertSentenceClassifier:
         ds = CSVDataset(df, self.tokenizer, text_col, label_col, label_map, self.cfg.max_length)
         collator = DataCollatorWithPadding(tokenizer=self.tokenizer)
 
+        _prepare_fresh_output_dir(self.cfg.out_dir)
+
         args = TrainingArguments(
-            output_dir=self.cfg.out_dir,
-            overwrite_output_dir=True,
-            num_train_epochs=epochs,
-            per_device_train_batch_size=batch_size,
-            learning_rate=lr,
-            logging_steps=50,
-            save_strategy="epoch",
-            save_total_limit=1,
-            report_to=[],
+            **_filter_init_kwargs(
+                TrainingArguments,
+                {
+                    "output_dir": self.cfg.out_dir,
+                    "overwrite_output_dir": True,  # transformers < 5 only
+                    "num_train_epochs": epochs,
+                    "per_device_train_batch_size": batch_size,
+                    "learning_rate": lr,
+                    "logging_steps": 50,
+                    "save_strategy": "epoch",
+                    "save_total_limit": 1,
+                    "report_to": [],
+                },
+            )
         )
 
-        trainer = Trainer(
-            model=self.model,
-            args=args,
-            train_dataset=ds,
-            tokenizer=self.tokenizer,
-            data_collator=collator,
-        )
+        trainer_kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "args": args,
+            "train_dataset": ds,
+            "tokenizer": self.tokenizer,
+            "data_collator": collator,
+        }
+        if "tokenizer" not in inspect.signature(Trainer.__init__).parameters:
+            trainer_kwargs["processing_class"] = trainer_kwargs.pop("tokenizer")
+
+        trainer = Trainer(**_filter_init_kwargs(Trainer, trainer_kwargs))
         trainer.train()
         trainer.save_model(self.cfg.out_dir)
         self.tokenizer.save_pretrained(self.cfg.out_dir)

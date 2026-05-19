@@ -19,8 +19,10 @@ from lang_config import (
     COLAB_LIGHT_BERT,
 )
 from embedding_runtime import TextEmbedder
+from paths import package_path, resolve_existing_path
 
 MIXTRAL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+DEFAULT_BERT_TRAIN_CSV = package_path("train.csv")
 LLAMA_31_8B = "meta-llama/Llama-3.1-8B-Instruct"
 LLAMA_33_70B = "meta-llama/Llama-3.3-70B-Instruct"
 LIGHT_MODEL = "meta-llama/Llama-3.2-3B-Instruct"
@@ -129,7 +131,12 @@ def main():
         help="Sentence-transformer for vi refinement (default: multilingual-e5-base when --lang vi)",
     )
     parser.add_argument("--train_bert_if_missing", action="store_true")
-    parser.add_argument("--bert_train_csv", type=str, default="train.csv")
+    parser.add_argument(
+        "--bert_train_csv",
+        type=str,
+        default=DEFAULT_BERT_TRAIN_CSV,
+        help=f"BERT fine-tune CSV (default: {DEFAULT_BERT_TRAIN_CSV})",
+    )
     parser.add_argument("--bert_text_col", type=str, default="sentence")
     parser.add_argument("--bert_label_col", type=str, default="label")
     parser.add_argument("--bert_epochs", type=int, default=3)
@@ -187,8 +194,13 @@ def main():
         bert.load()
     else:
         if args.train_bert_if_missing:
+            bert_train_csv = resolve_existing_path(
+                args.bert_train_csv,
+                fallbacks=("train.csv",),
+                description="BERT training CSV",
+            )
             bert.train_if_missing(
-                train_csv=args.bert_train_csv,
+                train_csv=bert_train_csv,
                 text_col=args.bert_text_col,
                 label_col=args.bert_label_col,
                 epochs=args.bert_epochs,
