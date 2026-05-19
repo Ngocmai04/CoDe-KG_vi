@@ -49,3 +49,53 @@ def resolve_existing_path(
         f"Tried:\n  - {tried}\n"
         f"Place train.csv in {PACKAGE_DIR} or pass --bert_train_csv /full/path/train.csv"
     )
+
+
+BERT_TEXT_COL_ALIASES: tuple[str, ...] = (
+    "Sentence",
+    "sentence",
+    "text",
+    "Text",
+    "content",
+    "abstract",
+    "Abstract",
+)
+BERT_LABEL_COL_ALIASES: tuple[str, ...] = (
+    "label",
+    "Label",
+    "labels",
+    "Labels",
+    "class",
+    "category",
+)
+
+
+def resolve_csv_column(
+    columns,
+    preferred: str,
+    aliases: tuple[str, ...],
+    *,
+    role: str = "column",
+) -> str:
+    """Resolve a CSV column name (supports 'auto' and case-insensitive match)."""
+    cols = list(columns)
+    col_set = set(cols)
+    lower_to_orig = {c.lower(): c for c in cols}
+
+    if preferred and preferred != "auto":
+        if preferred in col_set:
+            return preferred
+        if preferred.lower() in lower_to_orig:
+            return lower_to_orig[preferred.lower()]
+
+    for name in aliases:
+        if name in col_set:
+            return name
+        if name.lower() in lower_to_orig:
+            return lower_to_orig[name.lower()]
+
+    raise KeyError(
+        f"Could not resolve {role} column (preferred={preferred!r}). "
+        f"Available columns: {cols}. "
+        f"Expected one of: {(preferred, *aliases) if preferred != 'auto' else aliases}"
+    )

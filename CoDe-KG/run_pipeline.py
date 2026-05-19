@@ -137,8 +137,18 @@ def main():
         default=DEFAULT_BERT_TRAIN_CSV,
         help=f"BERT fine-tune CSV (default: {DEFAULT_BERT_TRAIN_CSV})",
     )
-    parser.add_argument("--bert_text_col", type=str, default="sentence")
-    parser.add_argument("--bert_label_col", type=str, default="label")
+    parser.add_argument(
+        "--bert_text_col",
+        type=str,
+        default="auto",
+        help="BERT train CSV text column (auto: Sentence/sentence/text/...)",
+    )
+    parser.add_argument(
+        "--bert_label_col",
+        type=str,
+        default="auto",
+        help="BERT train CSV label column (auto: label/Label/...)",
+    )
     parser.add_argument("--bert_epochs", type=int, default=3)
     parser.add_argument("--bert_train_batch_size", type=int, default=8)
     parser.add_argument("--bert_lr", type=float, default=2e-5)

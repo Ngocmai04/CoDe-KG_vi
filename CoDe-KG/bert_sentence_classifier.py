@@ -7,7 +7,12 @@ from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
 
-from paths import resolve_existing_path
+from paths import (
+    resolve_existing_path,
+    resolve_csv_column,
+    BERT_TEXT_COL_ALIASES,
+    BERT_LABEL_COL_ALIASES,
+)
 import torch
 from transformers import (
     AutoTokenizer,
@@ -114,6 +119,23 @@ class BertSentenceClassifier:
                 df = pd.read_csv(train_csv, encoding="utf-8-sig")
             except UnicodeDecodeError:
                 df = pd.read_csv(train_csv, encoding="latin-1")
+
+        text_col = resolve_csv_column(
+            df.columns, text_col, BERT_TEXT_COL_ALIASES, role="text"
+        )
+        label_col = resolve_csv_column(
+            df.columns, label_col, BERT_LABEL_COL_ALIASES, role="label"
+        )
+        print(f"[bert] columns: text={text_col!r}, label={label_col!r}")
+
+        unknown = ~df[label_col].astype(str).isin(label_map.keys())
+        if unknown.any():
+            n_drop = int(unknown.sum())
+            print(f"[bert] dropping {n_drop} rows with labels outside {sorted(label_map)}")
+            df = df.loc[~unknown].reset_index(drop=True)
+
+        if df.empty:
+            raise ValueError("No training rows left after label filtering.")
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(
